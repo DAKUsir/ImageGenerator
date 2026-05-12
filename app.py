@@ -1,8 +1,8 @@
 import os
 import uuid
-from datetime import datetime
+import tempfile
 
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_from_directory
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
@@ -15,41 +15,45 @@ if not HF_TOKEN:
 client = InferenceClient(provider="auto", api_key=HF_TOKEN)
 
 app = Flask(__name__)
-OUTPUT_DIR = os.path.join("static", "images")
+OUTPUT_DIR = os.path.join(tempfile.gettempdir(), "imagegen")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def index():
-    image_path = None
-    error = None
+    return render_template("index.html")
 
-    if request.method == "POST":
-        prompt = request.form.get("prompt", "").strip()
-        if not prompt:
-            error = "Prompt is required"
-        else:
-            negative = request.form.get("negative_prompt", "").strip() or None
-            model = request.form.get("model", "stabilityai/stable-diffusion-xl-base-1.0")
-            steps = int(request.form.get("steps", 25))
-            guidance = float(request.form.get("guidance_scale", 7.5))
-            width = int(request.form.get("width", 1024))
-            height = int(request.form.get("height", 1024))
 
-            params = dict(prompt=prompt, model=model, num_inference_steps=steps, guidance_scale=guidance, width=width, height=height)
-            if negative:
-                params["negative_prompt"] = negative
+@app.route("/generate", methods=["POST"])
+def generate():
+    prompt = request.form.get("prompt", "").strip()
+    if not prompt:
+        return render_template("index.html", error="Prompt is required")
 
-            try:
-                image = client.text_to_image(**params)
-                filename = f"{uuid.uuid4().hex}.png"
-                filepath = os.path.join(OUTPUT_DIR, filename)
-                image.save(filepath)
-                image_path = f"images/{filename}"
-            except Exception as e:
-                error = str(e)
+    negative = request.form.get("negative_prompt", "").strip() or None
+    model = request.form.get("model", "stabilityai/stable-diffusion-xl-base-1.0")
+    steps = int(request.form.get("steps", 25))
+    guidance = float(request.form.get("guidance_scale", 7.5))
+    width = int(request.form.get("width", 1024))
+    height = int(request.form.get("height", 1024))
 
-    return render_template("index.html", image_path=image_path, error=error)
+    params = dict(prompt=prompt, model=model, num_inference_steps=steps,
+                  guidance_scale=guidance, width=width, height=height)
+    if negative:
+        params["negative_prompt"] = negative
+
+    try:
+        image = client.text_to_image(**params)
+        filename = f"{uuid.uuid4().hex}.png"
+        image.save(os.path.join(OUTPUT_DIR, filename))
+        return render_template("index.html", image_file=filename)
+    except Exception as e:
+        return render_template("index.html", error=str(e))
+
+
+@app.route("/image/<filename>")
+def serve_image(filename):
+    return send_from_directory(OUTPUT_DIR, filename)
 
 
 if __name__ == "__main__":

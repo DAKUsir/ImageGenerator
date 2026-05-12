@@ -33,7 +33,7 @@
         <div class="error">{{ error }}</div>
         {% endif %}
 
-        <form class="card" method="post" onsubmit="document.querySelector('.spinner').style.display='block'; this.querySelector('button').disabled=true;">
+        <form class="card" action="/generate" method="post" onsubmit="document.querySelector('.spinner').style.display='block'; this.querySelector('button').disabled=true;">
             <div class="form-grid">
                 <div class="full">
                     <label for="prompt">Prompt</label>
@@ -72,10 +72,10 @@
             <div class="spinner"></div>
         </form>
 
-        {% if image_path %}
+        {% if image_file %}
         <div class="card result">
             <h3>Generated Image</h3>
-            <img src="{{ url_for('static', filename=image_path) }}" alt="Generated image">
+            <img src="/image/{{ image_file }}" alt="Generated image">
         </div>
         {% endif %}
     </div>
